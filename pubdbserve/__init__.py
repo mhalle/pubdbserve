@@ -1,0 +1,2 @@
+from .pubdbserve import app
+
