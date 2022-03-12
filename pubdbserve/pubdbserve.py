@@ -1,9 +1,20 @@
+from tracemalloc import start
 import sqlite_utils
 import os.path
 
-from fastapi import FastAPI, HTTPException
-from fastapi.responses import FileResponse
-from pydantic import BaseSettings
+from starlette.responses import FileResponse
+from starlette.applications import Starlette
+from starlette.exceptions import HTTPException
+from starlette.routing import Route
+from starlette.config import Config
+
+config = Config('./etc/config.env')
+
+settings = {
+    'assetstore_dir': config('ASSETSTORE_DIR', default='./assetstore'),
+    'pubdb_db': config('PUBDB_DB', default='./etc/pubdb-tables.sqlite'),
+    'url_base': config('URL_BASE', default='/')
+}
 
 bitstream_mapping = {}
 
@@ -14,34 +25,26 @@ def format_assetstore_file(dir, internal_id):
         internal_id[4:6],
         internal_id)
 
-class Settings(BaseSettings):
-    assetstore_dir: str = 'assetstore'
-    pubdb_db: str = ''
 
-    class Config:
-        env_file = './etc/config.env'
 
-settings = Settings()
+urlpat = f'{settings["url_base"]}' + '{bitstream_id}'
 
-app = FastAPI()
-
-@app.get('/publications/bitstream/download/{bitstream_id}')
-async def get_bitstream_file(bitstream_id: str):
+async def get_bitstream_file(request):
+    bitstream_id = request.path_params['bitstream_id']
     try:
         info = bitstream_mapping[bitstream_id]
     except KeyError:
         raise HTTPException(status_code=404, detail=f"HTTP Error 404: Item {bitstream_id} not found")
 
-    return FileResponse(format_assetstore_file(settings.assetstore_dir, info['hash']), 
+    return FileResponse(format_assetstore_file(settings['assetstore_dir'], info['hash']), 
                         media_type=info['mimetype'],
                         headers = { 
                             'Content-Disposition': f'inline; filename={info["filename"]}'
                         })
 
-@app.on_event('startup')
-def startup_event():
+def startup():
     global bitstream_mapping
-    db = sqlite_utils.Database(f'file:{settings.pubdb_db}?mode=ro')
+    db = sqlite_utils.Database(f'file:{settings["pubdb_db"]}?mode=ro')
     bitstream_mapping = {x['id']: x for x in (db.query('''select 
             bitstream.bitstream_id as id, 
             bitstream.internal_id as hash,
@@ -51,3 +54,8 @@ def startup_event():
         on bitstream.bitstream_format_id = bitstreamformatregistry.bitstream_format_id
         '''
         ))}
+
+routes = [
+    Route(urlpat, get_bitstream_file)
+]
+app = Starlette(routes=routes, on_startup=[startup])
