@@ -34,7 +34,8 @@ async def get_bitstream_file(request):
     try:
         info = bitstream_mapping[bitstream_id]
     except KeyError:
-        raise HTTPException(status_code=404, detail=f"HTTP Error 404: Item {bitstream_id} not found")
+        raise HTTPException(status_code=404, 
+            detail=f"HTTP Error 404: Item {bitstream_id} not found")
 
     return FileResponse(format_assetstore_file(settings['assetstore_dir'], info['hash']), 
                         media_type=info['mimetype'],
