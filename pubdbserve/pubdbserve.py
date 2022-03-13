@@ -50,9 +50,9 @@ def startup():
             bitstream.bitstream_id as id, 
             bitstream.internal_id as hash,
             bitstream.name as filename,
-            bitstreamformatregistry.mimetype as mimetype
-        from bitstream join bitstreamformatregistry
-        on bitstream.bitstream_format_id = bitstreamformatregistry.bitstream_format_id
+            bitstream_format.mimetype as mimetype
+        from bitstream join bitstream_format
+        on bitstream.bitstream_format_id = bitstream_format.bitstream_format_id
         '''
         ))}
 
